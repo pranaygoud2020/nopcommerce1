@@ -1,0 +1,76 @@
+---
+- name: install nop commerce
+  become: yes
+  hosts: all
+    tasks:
+    - name: download the debian file
+      get_url:
+        url: https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb
+        dest: /tmp/packages-microsoft-prod.deb
+    - name: install the debian package
+      apt:
+        deb: /tmp/packages-microsoft-prod.deb
+    - name: install .net core runtimes
+      apt:
+        name: "{{ item }}"
+        update_cache: yes
+        state: present
+      with_items:
+       - apt-transport-https
+       - aspnetcore-runtime-3.1
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: latest
+    - name: restart nginx
+      service:
+        name: nginx
+        state: started
+    - name: Remove file (delete file)
+      ansible.builtin.file:
+        path: /etc/nginx/sites-available/default
+        state: absent
+    - name: copy nginx config file
+      copy:
+        src: default
+        dest: /etc/nginx/sites-available/default
+    - name: create directory if they don't exist
+      file:
+        path: "{{ item }}"
+        state: directory
+        recurse: yes
+        owner: www-data
+        group: www-data
+      loop:
+        - /var/www/nopCommerce450
+        - /var/www/bin
+        - /var/www/log
+    - name: Install unzip
+      apt:
+        name: unzip
+        state: latest
+    - name: "Download file from url"
+      get_url:
+        url: https://github.com/nopSolutions/nopCommerce/releases/download/release-4.50.2/nopCommerce_4.50.2_NoSource_linux_x64.zip
+        dest: /var/www/nopCommerce450
+    - name: Unarchive a file
+      ansible.builtin.unarchive:
+        src: /var/www/nopCommerce450/nopCommerce_4.50.2_NoSource_linux_x64.zip
+        dest: /var/www/nopCommerce450
+        remote_src: yes
+    - name: create nopcommerce.services
+      copy:
+        src: service
+        dest: /etc/systemd/system/nopCommerce450.service
+    - name: Start nopCommerce is running
+      ansible.builtin.systemd:
+        name: nopCommerce450.service
+        state: started
+    - name: Start service , if not started
+      ansible.builtin.service:
+        name: nopCommerce450.service
+        state: started
+    - name: Restart service nginx
+      ansible.builtin.service:
+        name: nginx
+        state: restarted
